@@ -1,0 +1,130 @@
+{% extends "gimnasio/base.html" %}
+{% block titulo %}Clases{% endblock %}
+{% block nav_clases %}activo{% endblock %}
+{% block contenido %}
+<h1>Reserva de clases grupales</h1>
+<p class="suave">Si la clase está llena, quedas en lista de espera y pasas automáticamente cuando se libere un cupo.</p>
+<p id="mensaje" class="mensaje" hidden></p>
+<div id="sesiones" class="grid"><div class="suave">Cargando clases…</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const API_SESIONES = "{% url 'sesion-list' %}";
+  const API_RESERVAS = "{% url 'reserva-list' %}";
+  const API_ME = "{% url 'api-me' %}";
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  const fmt = new Intl.DateTimeFormat("es-CL", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+  function mostrar(texto, tipo) {
+    const m = document.getElementById("mensaje");
+    m.textContent = texto;
+    m.className = "mensaje " + tipo;
+    m.hidden = false;
+  }
+
+  async function pedir(url, opciones = {}) {
+    const respuesta = await fetch(url, {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json", "Content-Type": "application/json", "X-CSRFToken": csrf },
+      ...opciones,
+    });
+    let datos = null;
+    try { datos = await respuesta.json(); } catch (e) { datos = null; }
+    if (!respuesta.ok) {
+      const detalle = datos && (datos.detail || Object.values(datos).flat().join(" "));
+      throw new Error(detalle || ("Error " + respuesta.status));
+    }
+    return datos;
+  }
+
+  async function traerTodo(url) {
+    let resultados = [];
+    let siguiente = url + (url.includes("?") ? "&" : "?") + "page_size=100";
+    while (siguiente) {
+      const pagina = await pedir(siguiente);
+      resultados = resultados.concat(pagina.results);
+      siguiente = pagina.next;
+    }
+    return resultados;
+  }
+
+  function boton(texto, onClick, secundario = false, deshabilitado = false) {
+    const b = document.createElement("button");
+    b.className = "boton" + (secundario ? " secundario" : "");
+    b.textContent = texto;
+    b.disabled = deshabilitado;
+    b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await onClick(); } catch (err) { mostrar(err.message, "error"); }
+      await cargar();
+    });
+    return b;
+  }
+
+  function tarjeta(sesion, miReserva) {
+    const card = document.createElement("div");
+    card.className = "tarjeta";
+    const h = document.createElement("h2");
+    h.textContent = sesion.clase_nombre;
+    const cuando = document.createElement("p");
+    cuando.className = "suave";
+    cuando.textContent = fmt.format(new Date(sesion.inicio));
+    const cupos = document.createElement("p");
+    cupos.textContent = sesion.cupos_disponibles > 0
+      ? sesion.cupos_disponibles + " cupos disponibles"
+      : "Sin cupos: lista de espera";
+    const estado = document.createElement("p");
+    const acciones = document.createElement("div");
+    acciones.className = "acciones";
+
+    if (!miReserva) {
+      const lleno = sesion.cupos_disponibles <= 0;
+      acciones.appendChild(boton(lleno ? "Unirme a lista de espera" : "Reservar", async () => {
+        const r = await pedir(API_RESERVAS, { method: "POST", body: JSON.stringify({ sesion: sesion.id }) });
+        mostrar(r.estado === "ESPERA" ? "Quedaste en la lista de espera (puesto " + r.posicion_espera + ")." : "¡Reserva confirmada!", "ok");
+      }));
+    } else if (miReserva.estado === "CONFIRMADA") {
+      estado.innerHTML = '<span class="etiqueta ok">Reserva confirmada</span>';
+      acciones.appendChild(boton("Cancelar reserva", async () => {
+        await pedir(API_RESERVAS + miReserva.id + "/cancelar/", { method: "POST" });
+        mostrar("Reserva cancelada.", "aviso");
+      }, true));
+    } else if (miReserva.estado === "ESPERA") {
+      estado.innerHTML = '<span class="etiqueta aviso">Lista de espera · puesto ' + miReserva.posicion_espera + "</span>";
+      acciones.appendChild(boton("Salir de la lista", async () => {
+        await pedir(API_RESERVAS + miReserva.id + "/cancelar/", { method: "POST" });
+        mostrar("Saliste de la lista de espera.", "aviso");
+      }, true));
+    } else if (miReserva.estado === "ASISTIO") {
+      estado.innerHTML = '<span class="etiqueta neutro">Asistencia registrada</span>';
+    }
+
+    card.append(h, cuando, cupos, estado, acciones);
+    return card;
+  }
+
+  async function cargar() {
+    const contenedor = document.getElementById("sesiones");
+    try {
+      const [sesiones, reservas, yo] = await Promise.all([
+        traerTodo(API_SESIONES), traerTodo(API_RESERVAS), pedir(API_ME),
+      ]);
+      // El staff ve reservas de todos los socios: nos quedamos solo con las propias.
+      const activas = reservas.filter((r) => r.estado !== "CANCELADA" && r.socio === yo.socio_id);
+      const porSesion = new Map(activas.map((r) => [r.sesion, r]));
+      contenedor.replaceChildren();
+      if (!sesiones.length) {
+        contenedor.textContent = "No hay clases programadas próximamente.";
+        return;
+      }
+      sesiones.forEach((s) => contenedor.appendChild(tarjeta(s, porSesion.get(s.id))));
+    } catch (err) {
+      contenedor.textContent = "No se pudieron cargar las clases: " + err.message;
+    }
+  }
+
+  cargar();
+})();
+</script>
+{% endblock %}

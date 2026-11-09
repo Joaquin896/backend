@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+staticfiles/
+*.sqlite3
+.coverage
