@@ -1,0 +1,31 @@
+{% extends "gimnasio/base.html" %}
+{% block titulo %}Mi cuenta{% endblock %}
+{% block nav_cuenta %}activo{% endblock %}
+{% block contenido %}
+<h1>Mi cuenta</h1>
+{% if not socio %}
+  <div class="mensaje aviso">Tu usuario todavía no está vinculado a una ficha de socio. Pide en recepción que te asocien.</div>
+{% else %}
+<div class="grid">
+  <div class="tarjeta">
+    <h2>{{ socio.nombre }} {{ socio.apellido }}</h2>
+    <p class="suave">Documento: {{ socio.documento }}</p>
+    {% if membresia %}
+      <span class="etiqueta ok">Membresía activa</span>
+      <p>{{ membresia.plan.nombre }}<br><span class="suave">Vigente hasta {{ membresia.fecha_fin|date:"d/m/Y" }}</span></p>
+    {% elif ultima %}
+      <span class="etiqueta {% if estado_ultima == 'CONGELADA' %}aviso{% else %}error{% endif %}">{{ estado_ultima.label }}</span>
+      <p>{{ ultima.plan.nombre }}<br><span class="suave">Último día: {{ ultima.fecha_fin|date:"d/m/Y" }}</span></p>
+      <p class="suave">Acércate a recepción para renovar tu plan.</p>
+    {% else %}
+      <span class="etiqueta error">Sin membresía</span>
+    {% endif %}
+  </div>
+  <div class="tarjeta">
+    <h2>Mi código de acceso</h2>
+    <img class="qr-img" src="{% url 'socio-qr' socio.id %}" alt="Código QR de acceso">
+    <p class="suave">Muéstralo en el torniquete para entrar o salir.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

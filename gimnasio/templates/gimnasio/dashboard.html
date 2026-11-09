@@ -1,0 +1,129 @@
+{% extends "gimnasio/base.html" %}
+{% block titulo %}Aforo en vivo{% endblock %}
+{% block nav_dashboard %}activo{% endblock %}
+{% block contenido %}
+<h1>Control de aforo en tiempo real</h1>
+<p class="suave">Se actualiza automáticamente cada 5 segundos. Última actualización: <span id="actualizado">—</span></p>
+<p id="error" class="mensaje error" hidden>No se pudo actualizar. Reintentando…</p>
+
+<div class="grid">
+  <div class="tarjeta">
+    <h2>Personas dentro</h2>
+    <div class="numero" id="dentro">—</div>
+    <div class="suave">de un máximo de <span id="maximo">—</span></div>
+    <div class="barra-progreso"><div id="barra" style="width:0%"></div></div>
+  </div>
+  <div class="tarjeta">
+    <h2>Membresías vigentes</h2>
+    <div class="numero" id="vigentes">—</div>
+    <div class="suave">Vencidas: <span id="vencidas">—</span> · Congeladas: <span id="congeladas">—</span></div>
+  </div>
+</div>
+
+<h1 style="margin-top:24px">Clases de hoy</h1>
+<div class="tarjeta tabla-wrap">
+  <table>
+    <thead><tr><th>Hora</th><th>Clase</th><th>Instructor</th><th>Ocupación</th><th>Lista de espera</th></tr></thead>
+    <tbody id="clases"><tr><td colspan="5" class="suave">Cargando…</td></tr></tbody>
+  </table>
+</div>
+
+<h1 style="margin-top:24px">Últimos accesos</h1>
+<div class="tarjeta tabla-wrap">
+  <table>
+    <thead><tr><th>Hora</th><th>Socio / QR</th><th>Resultado</th><th>Tipo</th><th>Motivo</th></tr></thead>
+    <tbody id="accesos"><tr><td colspan="5" class="suave">Cargando…</td></tr></tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const URL = "{% url 'api-dashboard-aforo' %}";
+  const INTERVALO_MS = 5000;
+
+  function celda(texto) {
+    const td = document.createElement("td");
+    td.textContent = texto;
+    return td;
+  }
+
+  function fila(celdas) {
+    const tr = document.createElement("tr");
+    celdas.forEach((c) => tr.appendChild(c));
+    return tr;
+  }
+
+  function etiqueta(texto, clase) {
+    const span = document.createElement("span");
+    span.className = "etiqueta " + clase;
+    span.textContent = texto;
+    return span;
+  }
+
+  function pintarClases(clases) {
+    const cuerpo = document.getElementById("clases");
+    cuerpo.replaceChildren();
+    if (!clases.length) {
+      cuerpo.appendChild(fila([celda("No hay clases programadas para hoy.")]));
+      cuerpo.lastChild.firstChild.colSpan = 5;
+      return;
+    }
+    clases.forEach((c) => {
+      const ocupacion = document.createElement("td");
+      const texto = document.createElement("div");
+      texto.textContent = c.confirmadas + " / " + c.capacidad + " (" + c.ocupacion + "%)";
+      const barra = document.createElement("div");
+      barra.className = "barra-progreso";
+      const rel = document.createElement("div");
+      rel.style.width = Math.min(c.ocupacion, 100) + "%";
+      if (c.ocupacion >= 90) rel.className = "alto";
+      barra.appendChild(rel);
+      ocupacion.append(texto, barra);
+      cuerpo.appendChild(fila([celda(c.inicio), celda(c.clase), celda(c.instructor || "—"), ocupacion, celda(c.en_espera)]));
+    });
+  }
+
+  function pintarAccesos(accesos) {
+    const cuerpo = document.getElementById("accesos");
+    cuerpo.replaceChildren();
+    if (!accesos.length) {
+      cuerpo.appendChild(fila([celda("Aún no hay accesos registrados.")]));
+      return;
+    }
+    accesos.forEach((a) => {
+      const res = etiqueta(a.resultado, a.resultado === "Permitido" ? "ok" : "error");
+      const td = document.createElement("td");
+      td.appendChild(res);
+      cuerpo.appendChild(fila([celda(a.hora), celda(a.socio), td, celda(a.tipo || "—"), celda(a.motivo)]));
+    });
+  }
+
+  async function actualizar() {
+    try {
+      const respuesta = await fetch(URL, { credentials: "same-origin", headers: { Accept: "application/json" } });
+      if (!respuesta.ok) throw new Error("HTTP " + respuesta.status);
+      const datos = await respuesta.json();
+
+      document.getElementById("dentro").textContent = datos.aforo.personas_dentro;
+      document.getElementById("maximo").textContent = datos.aforo.maximo;
+      const barra = document.getElementById("barra");
+      barra.style.width = Math.min(datos.aforo.porcentaje, 100) + "%";
+      barra.className = datos.aforo.porcentaje >= 90 ? "alto" : "";
+      document.getElementById("vigentes").textContent = datos.membresias.vigentes;
+      document.getElementById("vencidas").textContent = datos.membresias.vencidas;
+      document.getElementById("congeladas").textContent = datos.membresias.congeladas;
+      document.getElementById("actualizado").textContent = new Date(datos.actualizado_en).toLocaleTimeString("es-CL");
+      pintarClases(datos.clases_hoy);
+      pintarAccesos(datos.ultimos_accesos);
+      document.getElementById("error").hidden = true;
+    } catch (err) {
+      document.getElementById("error").hidden = false;
+    }
+  }
+
+  actualizar();
+  setInterval(actualizar, INTERVALO_MS);
+})();
+</script>
+{% endblock %}

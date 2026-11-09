@@ -1,0 +1,48 @@
+{% extends "gimnasio/base.html" %}
+{% block titulo %}Acceso por QR{% endblock %}
+{% block nav_acceso %}activo{% endblock %}
+{% block contenido %}
+<h1>Control de acceso por QR</h1>
+<p class="suave">Simula la lectura del torniquete: pega el contenido del QR del socio (el UUID) y envía. Si el socio ya está dentro, la lectura registra la salida.</p>
+
+{% if resultado %}
+  <div class="tarjeta" style="margin-bottom:16px;border-width:2px;border-color:{% if resultado.resultado == 'PERMITIDO' %}var(--ok){% else %}var(--error){% endif %}">
+    <div class="acciones" style="justify-content:space-between;align-items:center">
+      <span class="grande">{% if resultado.resultado == 'PERMITIDO' %}✔ Permitido{% else %}✖ Denegado{% endif %}</span>
+      <span class="etiqueta {% if resultado.resultado == 'PERMITIDO' %}ok{% else %}error{% endif %}">{{ resultado.get_tipo_display|default:"Sin movimiento" }}</span>
+    </div>
+    <p><strong>{{ resultado.socio|default:"Socio no identificado" }}</strong></p>
+    <p class="suave">{{ resultado.motivo }} · {{ resultado.fecha_hora|date:"d/m/Y H:i:s" }}</p>
+  </div>
+{% endif %}
+
+<div class="tarjeta" style="margin-bottom:16px">
+  <form method="post" class="formulario">
+    {% csrf_token %}
+    <label>Contenido del QR (UUID)
+      <input type="text" name="token" required placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off" autofocus>
+    </label>
+    <button class="boton" type="submit">Leer QR</button>
+  </form>
+</div>
+
+<h2>Últimos registros</h2>
+<div class="tarjeta tabla-wrap">
+  <table>
+    <thead><tr><th>Hora</th><th>Socio</th><th>Resultado</th><th>Tipo</th><th>Motivo</th></tr></thead>
+    <tbody>
+      {% for r in ultimos %}
+      <tr>
+        <td>{{ r.fecha_hora|date:"H:i:s" }}</td>
+        <td>{{ r.socio|default:r.token_leido }}</td>
+        <td><span class="etiqueta {% if r.resultado == 'PERMITIDO' %}ok{% else %}error{% endif %}">{{ r.get_resultado_display }}</span></td>
+        <td>{{ r.get_tipo_display|default:"—" }}</td>
+        <td>{{ r.motivo }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="suave">Aún no hay registros.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% load static %}<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block titulo %}FitLife{% endblock %} · FitLife</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      --fondo: #f5f7fb; --tarjeta: #ffffff; --texto: #1d2433; --suave: #6b7485;
+      --primario: #0f766e; --primario-suave: #ccfbf1; --ok: #15803d; --ok-suave: #dcfce7;
+      --error: #b91c1c; --error-suave: #fee2e2; --aviso: #b45309; --aviso-suave: #fef3c7;
+      --borde: #e2e8f0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --fondo: #0f1419; --tarjeta: #1a212b; --texto: #e6ebf2; --suave: #9aa4b2;
+        --primario: #2dd4bf; --primario-suave: #123c39; --ok: #4ade80; --ok-suave: #14321f;
+        --error: #f87171; --error-suave: #3b1717; --aviso: #fbbf24; --aviso-suave: #3a2d10;
+        --borde: #2a3440;
+      }
+    }
+    :root[data-theme="dark"] {
+      --fondo: #0f1419; --tarjeta: #1a212b; --texto: #e6ebf2; --suave: #9aa4b2;
+      --primario: #2dd4bf; --primario-suave: #123c39; --ok: #4ade80; --ok-suave: #14321f;
+      --error: #f87171; --error-suave: #3b1717; --aviso: #fbbf24; --aviso-suave: #3a2d10;
+      --borde: #2a3440;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--fondo); color: var(--texto); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.45; }
+    a { color: var(--primario); }
+    header.barra { background: var(--tarjeta); border-bottom: 1px solid var(--borde); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+    .marca { font-weight: 800; font-size: 1.15rem; color: var(--primario); text-decoration: none; }
+    nav a { margin-right: 14px; text-decoration: none; font-weight: 600; }
+    nav a.activo { border-bottom: 2px solid var(--primario); padding-bottom: 2px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 1.5rem; margin: 8px 0 16px; }
+    h2 { font-size: 1.1rem; margin: 0 0 10px; }
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    .tarjeta { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 16px; }
+    .numero { font-size: 2rem; font-weight: 800; }
+    .suave { color: var(--suave); font-size: .9rem; }
+    .barra-progreso { height: 10px; background: var(--borde); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+    .barra-progreso > div { height: 100%; background: var(--primario); transition: width .6s ease; }
+    .barra-progreso > div.alto { background: var(--error); }
+    table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+    .tabla-wrap { overflow-x: auto; }
+    .etiqueta { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: .8rem; font-weight: 700; }
+    .ok { background: var(--ok-suave); color: var(--ok); }
+    .error { background: var(--error-suave); color: var(--error); }
+    .aviso { background: var(--aviso-suave); color: var(--aviso); }
+    .neutro { background: var(--primario-suave); color: var(--primario); }
+    .boton { appearance: none; border: 0; border-radius: 8px; padding: 10px 16px; background: var(--primario); color: #fff; font-weight: 700; cursor: pointer; font-size: .95rem; text-decoration: none; display: inline-block; }
+    .boton.secundario { background: transparent; color: var(--primario); border: 1px solid var(--primario); }
+    .boton:disabled { opacity: .5; cursor: not-allowed; }
+    input, select { font: inherit; padding: 10px 12px; border: 1px solid var(--borde); border-radius: 8px; background: var(--fondo); color: var(--texto); width: 100%; }
+    form.formulario { display: grid; gap: 12px; max-width: 420px; }
+    label { font-weight: 600; font-size: .9rem; display: grid; gap: 4px; }
+    .acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+    .mensaje { padding: 12px 14px; border-radius: 10px; margin-bottom: 12px; }
+    .grande { font-size: 1.6rem; font-weight: 800; }
+    .qr-img { width: 100%; max-width: 260px; background: #fff; border-radius: 12px; padding: 8px; }
+    .pie { color: var(--suave); font-size: .8rem; text-align: center; padding: 24px 0; }
+    @media (max-width: 600px) {
+      nav a { margin-right: 10px; }
+      .numero { font-size: 1.6rem; }
+      table { font-size: .85rem; }
+      th, td { padding: 6px 4px; }
+      .tabla-wrap table { min-width: 520px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="barra">
+    <a class="marca" href="{% url 'inicio' %}">FitLife</a>
+    {% if user.is_authenticated %}
+    <nav>
+      {% if user.is_staff %}
+        <a href="{% url 'dashboard' %}" class="{% block nav_dashboard %}{% endblock %}">Aforo</a>
+        <a href="{% url 'simular-acceso' %}" class="{% block nav_acceso %}{% endblock %}">Acceso QR</a>
+        <a href="{% url 'admin:index' %}">Administración</a>
+      {% endif %}
+      <a href="{% url 'clases' %}" class="{% block nav_clases %}{% endblock %}">Clases</a>
+      <a href="{% url 'mi-cuenta' %}" class="{% block nav_cuenta %}{% endblock %}">Mi cuenta</a>
+    </nav>
+    <form method="post" action="{% url 'logout' %}" style="margin:0">
+      {% csrf_token %}
+      <button class="boton secundario" type="submit">Salir</button>
+    </form>
+    {% endif %}
+  </header>
+  <main>
+    {% block contenido %}{% endblock %}
+  </main>
+  <div class="pie">FitLife · Control de asistencia y reservas</div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
